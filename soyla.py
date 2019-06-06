@@ -7,10 +7,18 @@ import os
 from scipy.io import wavfile
 
 
+class MyEdit(urwid.Edit):
+    def keypress(self, size, key):
+        if key == 'enter':
+            return
+        super(MyEdit, self).keypress(size, key)
+
+
 class Soyla(object):
     WAITING = 0
     RECORDING = 1
     PLAYING = 2
+    EDITING = 3
 
     SAMPLERATE = 44100
 
@@ -29,15 +37,17 @@ class Soyla(object):
     def _init_widgets(self):
         self.state_text = urwid.Text('', align='center')
         self.line_text = urwid.Text('', align='center')
+        self.line_edit = urwid.Edit(align='center')
+        self.line = urwid.WidgetPlaceholder(self.line_text)
         pile = urwid.Pile([
-            ('weight', 1, urwid.Filler(self.line_text)),
+            ('weight', 1, urwid.Filler(self.line)),
             ('pack', urwid.Divider('-')),
             ('weight', 1, urwid.Filler(self.state_text)),
         ])
         self.top = pile
 
     def handle_input(self, key):
-        if key in ('q', 'Q'):
+        if key in ('q', 'Q', 'esc'):
             raise urwid.ExitMainLoop()
         if key in ('r', 'R'):
             return self.record()
@@ -49,6 +59,10 @@ class Soyla(object):
             return self.change_line(1)
         if key in ('k', 'K'):
             return self.change_line(-1)
+        if key in ('e', 'E'):
+            return self.edit()
+        if key == 'enter':
+            return self.finish_edit()
 
     def set_state(self, s):
         self.state = s
@@ -98,8 +112,27 @@ class Soyla(object):
             self.l_index = self.lines_len - 1
         self.draw()
 
+    def edit(self):
+        if self.state != self.WAITING:
+            return
+        self.line.original_widget = self.line_edit
+        self.line_edit.set_edit_text(self.cur_line)
+        self.line_edit.set_edit_pos(len(self.cur_line) - 1)
+        self.set_state(self.EDITING)
+
+    def finish_edit(self):
+        if self.state != self.EDITING:
+            return
+        self.line.original_widget = self.line_text
+        self.cur_line = self.line_edit.get_edit_text()
+        self.set_state(self.WAITING)
+
     def run(self):
-        self.loop = urwid.MainLoop(self.top, unhandled_input=lambda k: self.handle_input(k))
+        self.loop = urwid.MainLoop(
+            self.top,
+            unhandled_input=lambda k: self.handle_input(k),
+            pop_ups=True,
+        )
         self.loop.run()
 
     def force_paint(self):
@@ -114,6 +147,8 @@ class Soyla(object):
             txt = "Recording"
         elif self.state == self.PLAYING:
             txt = "Playing"
+        elif self.state == self.EDITING:
+            txt = "Editing text"
         else:
             txt = "Waiting"
         self.state_text.set_text(txt)
@@ -121,6 +156,11 @@ class Soyla(object):
     @property
     def cur_line(self):
         return self.lines[self.l_index][0]
+
+    @cur_line.setter
+    def cur_line(self, l):
+        _, s, b = self.lines[self.l_index]
+        self.lines[self.l_index] = (l, s, b)
 
     @property
     def cur_sound(self):

@@ -22,17 +22,28 @@ class Soyla(object):
 
     SAMPLERATE = 44100
 
-    def __init__(self, lines, save_dir):
+    def __init__(self, lines_file, save_dir):
         self.save_dir = save_dir
-        self._init_state(lines)
+        self.lines_file = lines_file
+        self._init_state()
         self._init_widgets()
         self.draw()
 
-    def _init_state(self, txt_lines):
-        self.state = self.WAITING
-        self.lines = [(l, None, False) for l in txt_lines]
+    def _read_lines(self):
+        with open(self.lines_file, 'r') as f:
+            txt_lines = f.readlines()
+        self.lines = [(l.strip(), None, False) for l in txt_lines]
         self.lines_len = len(self.lines)
         self.l_index = 0
+
+    def _save_lines(self):
+        txt = '\n'.join([l[0] for l in self.lines])
+        with open(self.lines_file, 'w') as f:
+            f.write(txt)
+
+    def _init_state(self):
+        self._read_lines()
+        self.state = self.WAITING
 
     def _init_widgets(self):
         self.state_text = urwid.Text('', align='center')
@@ -117,7 +128,7 @@ class Soyla(object):
             return
         self.line.original_widget = self.line_edit
         self.line_edit.set_edit_text(self.cur_line)
-        self.line_edit.set_edit_pos(len(self.cur_line) - 1)
+        self.line_edit.set_edit_pos(len(self.cur_line))
         self.set_state(self.EDITING)
 
     def finish_edit(self):
@@ -125,6 +136,7 @@ class Soyla(object):
             return
         self.line.original_widget = self.line_text
         self.cur_line = self.line_edit.get_edit_text()
+        self._save_lines()
         self.set_state(self.WAITING)
 
     def run(self):
@@ -175,13 +187,6 @@ class Soyla(object):
         self.line_text.set_text(txt)
 
 
-def read_lines(input_file):
-    with open(input_file, 'r') as f:
-        lines = f.readlines()
-    return lines
-
-
 def main(input_file, save_dir):
-    lines = read_lines(input_file)
-    s = Soyla(lines, save_dir)
+    s = Soyla(input_file, save_dir)
     s.run()

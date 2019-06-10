@@ -131,16 +131,28 @@ class Soyla(object):
             self.stream.start()
 
     def play(self):
+        if self.state == self.PLAYING:
+            self.out_stream.stop()
+            return
         if self.state != self.WAITING or self.cur_sound is None:
             return
         self.set_state(self.PLAYING)
 
-        def task():
-            sd.play(self.cur_sound, samplerate=self.SAMPLERATE)
-            sd.wait()
+        def fcallback():
             self.set_state(self.WAITING)
             self.force_paint()
-        threading.Thread(target=task).start()
+
+        def callback(outdata, frames, time, status):
+            if self.play_frames + frames > self.play_buf.size:
+                raise sd.CallbackStop()
+            outdata[:, 0] = self.play_buf[self.play_frames:self.play_frames + frames]
+            self.play_frames += frames
+
+        self.play_buf = np.copy(self.cur_sound)
+        self.play_frames = 0
+        self.out_stream = sd.OutputStream(channels=1, samplerate=self.SAMPLERATE,
+                                          callback=callback, finished_callback=fcallback)
+        self.out_stream.start()
 
     def save_current(self):
         wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,

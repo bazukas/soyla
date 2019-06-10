@@ -1,4 +1,5 @@
 # encoding: utf-8
+import glob
 import numpy as np
 import sounddevice as sd
 import threading
@@ -38,10 +39,23 @@ class Soyla(object):
         self._init_widgets()
         self.draw()
 
+    def _read_wavs(self):
+        wavs = glob.glob(os.path.join(self.save_dir, '*.wav'))
+        res = {}
+        for w in wavs:
+            i = os.path.splitext(os.path.basename(w))[0]
+            try:
+                i = int(i)
+            except ValueError:
+                continue
+            _, res[i] = wavfile.read(w)
+        return res
+
     def _read_lines(self):
         with open(self.lines_file, 'r') as f:
             txt_lines = f.readlines()
-        self.lines = [(l.strip(), None, False) for l in txt_lines]
+        wavs = self._read_wavs()
+        self.lines = [(l.strip(), wavs.get(i), False) for i, l in enumerate(txt_lines)]
         self.lines_len = len(self.lines)
         self.l_index = 0
 

@@ -88,7 +88,6 @@ class Soyla(object):
         lines = [l[0] for l in self.lines]
         for i, l in enumerate(lines):
             lines[i] = "{}. {}".format(i, l)
-        # lines = [l + '...' for l in lines]
         lines = [urwid.Text(l, wrap='clip') for l in lines]
         lines = [urwid.AttrMap(l, None, focus_map='reversed') for l in lines]
         return lines
@@ -100,8 +99,6 @@ class Soyla(object):
             raise urwid.ExitMainLoop()
         if key in ('r', 'R'):
             return self.record()
-        if key in ('s', 'S'):
-            return self.save()
         if key == ' ':
             return self.play()
         if key in ('j', 'J', 'down'):
@@ -122,6 +119,7 @@ class Soyla(object):
             self.stream.stop()
             self.stream.close()
             self.cur_sound = np.concatenate(self.indata)
+            self.save_current()
             self.set_state(self.WAITING)
         elif self.state == self.WAITING:
             self.set_state(self.RECORDING)
@@ -144,12 +142,9 @@ class Soyla(object):
             self.force_paint()
         threading.Thread(target=task).start()
 
-    def save(self):
-        if self.state != self.WAITING:
-            return
-        for i, l in enumerate(self.lines):
-            if l[2] and l[1] is not None:
-                wavfile.write(os.path.join(self.save_dir, '%d.wav') % i, self.SAMPLERATE, l[1])
+    def save_current(self):
+        wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,
+                      self.SAMPLERATE, self.cur_sound)
 
     def change_line(self, d):
         if self.state != self.WAITING:

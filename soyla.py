@@ -72,7 +72,7 @@ class Soyla(object):
     def _init_widgets(self):
         self.state_text = urwid.Text('', align='center')
         self.line_text = urwid.Text('', align='center')
-        self.line_edit = urwid.Edit(align='center')
+        self.line_edit = MyEdit(align='center')
         self.line = urwid.WidgetPlaceholder(self.line_text)
         self.line_list = MyListBox(urwid.SimpleFocusListWalker(self._get_side_list()))
         self.audio_status_line = urwid.Text('')
@@ -97,8 +97,10 @@ class Soyla(object):
 
     def _get_side_list(self):
         lines = [l[0] for l in self.lines]
-        for i, l in enumerate(lines):
-            lines[i] = "{}. {}".format(i, l)
+        lines = []
+        for i, l in enumerate(self.lines):
+            check = ' ' if l[1] is None else u'\u2714'
+            lines.append("{}  {}. {}".format(check, i, l[0]))
         lines = [urwid.Text(l, wrap='clip') for l in lines]
         lines = [urwid.AttrMap(l, None, focus_map='reversed') for l in lines]
         return lines

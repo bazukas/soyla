@@ -78,8 +78,9 @@ class Soyla(object):
         self.line_text = urwid.Text('', align='center')
         self.line_edit = MyEdit(align='center')
         self.line = urwid.WidgetPlaceholder(self.line_text)
-        self.line_list = MyListBox(urwid.SimpleFocusListWalker(self._get_side_list()))
-        self.line_list.set_focus(self.l_index)
+        self.line_list = self._get_side_list()
+        self.line_listbox = MyListBox(urwid.SimpleFocusListWalker(self.line_list))
+        self.line_listbox.set_focus(self.l_index)
         self.audio_status_line = urwid.Text('')
         self.status_line = urwid.Text('', align='right')
         status = urwid.Columns([
@@ -95,17 +96,20 @@ class Soyla(object):
         ])
         vline = urwid.AttrWrap(urwid.SolidFill(u'\u2502'), 'line')
         self.top = urwid.Columns([
-            ('weight', 1, urwid.Padding(self.line_list, left=1, right=1)),
+            ('weight', 1, urwid.Padding(self.line_listbox, left=1, right=1)),
             ('fixed', 1, vline),
             ('weight', 2, main_window),
         ])
+
+    def _format_line_for_sidebar(self, i):
+        check = ' ' if self.lines[i][1] is None else u'\u2714'
+        return "{}  {}. {}".format(check, i, self.lines[i][0])
 
     def _get_side_list(self):
         lines = [l[0] for l in self.lines]
         lines = []
         for i, l in enumerate(self.lines):
-            check = ' ' if l[1] is None else u'\u2714'
-            lines.append("{}  {}. {}".format(check, i, l[0]))
+            lines.append(self._format_line_for_sidebar(i))
         lines = [urwid.Text(l, wrap='clip') for l in lines]
         lines = [urwid.AttrMap(l, None, focus_map='reversed') for l in lines]
         return lines
@@ -176,6 +180,7 @@ class Soyla(object):
         wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,
                       self.SAMPLERATE, self.cur_sound)
         self.status_line.set_text("Saved")
+        self.line_list[self.l_index].original_widget.set_text(self._format_line_for_sidebar(self.l_index))
 
         def task():
             time.sleep(1)
@@ -191,7 +196,7 @@ class Soyla(object):
             self.l_index = 0
         elif self.l_index >= self.lines_len:
             self.l_index = self.lines_len - 1
-        self.line_list.set_focus(self.l_index)
+        self.line_listbox.set_focus(self.l_index)
         self.draw()
 
     def edit(self):

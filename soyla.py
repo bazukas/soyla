@@ -4,6 +4,8 @@ import numpy as np
 import sounddevice as sd
 import urwid
 import os
+import threading
+import time
 from scipy.io import wavfile
 
 
@@ -73,13 +75,18 @@ class Soyla(object):
         self.line_edit = urwid.Edit(align='center')
         self.line = urwid.WidgetPlaceholder(self.line_text)
         self.line_list = MyListBox(urwid.SimpleFocusListWalker(self._get_side_list()))
-        self.status_line = urwid.Text('')
+        self.audio_status_line = urwid.Text('')
+        self.status_line = urwid.Text('', align='right')
+        status = urwid.Columns([
+            ('weight', 1, self.audio_status_line),
+            ('weight', 1, self.status_line),
+        ])
         main_window = urwid.Pile([
             ('weight', 1, urwid.Filler(self.line)),
             ('pack', urwid.Divider('-')),
             ('weight', 1, urwid.Filler(self.state_text)),
             ('pack', urwid.Divider('-')),
-            (1, urwid.Padding(urwid.Filler(self.status_line), left=1)),
+            (1, urwid.Padding(urwid.Filler(status), left=1, right=1)),
         ])
         vline = urwid.AttrWrap(urwid.SolidFill(u'\u2502'), 'line')
         self.top = urwid.Columns([
@@ -161,6 +168,13 @@ class Soyla(object):
     def save_current(self):
         wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,
                       self.SAMPLERATE, self.cur_sound)
+        self.status_line.set_text("Saved")
+
+        def task():
+            time.sleep(1)
+            self.status_line.set_text("")
+            self.force_paint()
+        threading.Thread(target=task).start()
 
     def change_line(self, d):
         if self.state != self.WAITING:
@@ -213,7 +227,7 @@ class Soyla(object):
     def draw(self):
         self._draw_state_text()
         self._draw_line_text()
-        self._draw_status_line()
+        self._draw_audio_status_line()
 
     def _draw_state_text(self):
         if self.state == self.RECORDING:
@@ -226,14 +240,14 @@ class Soyla(object):
             txt = "Waiting"
         self.state_text.set_text(txt)
 
-    def _draw_status_line(self):
+    def _draw_audio_status_line(self):
         status = ""
         if self.cur_sound is None:
             status = "No recording"
         else:
             length = self.cur_sound.size / self.SAMPLERATE
             status = "Recording length: {:.2f} seconds".format(length)
-        self.status_line.set_text(status)
+        self.audio_status_line.set_text(status)
 
     @property
     def cur_line(self):

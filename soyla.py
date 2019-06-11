@@ -7,13 +7,6 @@ import os
 from scipy.io import wavfile
 
 
-class MyEdit(urwid.Edit):
-    def keypress(self, size, key):
-        if key == 'enter':
-            return 'enter'
-        super(MyEdit, self).keypress(size, key)
-
-
 class MyListBox(urwid.ListBox):
     def keypress(self, size, key):
         return key
@@ -74,7 +67,7 @@ class Soyla(object):
     def _init_widgets(self):
         self.state_text = urwid.Text('', align='center')
         self.line_text = urwid.Text('', align='center')
-        self.line_edit = MyEdit(align='center')
+        self.line_edit = urwid.Edit(align='center')
         self.line = urwid.WidgetPlaceholder(self.line_text)
         self.line_list = self._get_side_list()
         self.line_listbox = MyListBox(urwid.SimpleFocusListWalker(self.line_list))
@@ -197,7 +190,7 @@ class Soyla(object):
         self.line.original_widget = self.line_edit
         self.line_edit.set_edit_text(self.cur_line)
         self.line_edit.set_edit_pos(len(self.cur_line))
-        self.top.set_focus(1)
+        self.top.set_focus(2)
         self.set_state(self.EDITING)
 
     def cancel_edit(self):
@@ -214,6 +207,7 @@ class Soyla(object):
         self.cur_line = self.line_edit.get_edit_text()
         self._save_lines()
         self.top.set_focus(0)
+        self.line_list[self.l_index].original_widget.set_text(self._format_line_for_sidebar(self.l_index))
         self.set_state(self.WAITING)
 
     def run(self):

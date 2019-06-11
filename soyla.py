@@ -4,8 +4,6 @@ import numpy as np
 import sounddevice as sd
 import urwid
 import os
-import threading
-import time
 from scipy.io import wavfile
 
 
@@ -143,12 +141,13 @@ class Soyla(object):
             self.cur_sound = np.concatenate(self.indata)
             self.save_current()
             self.set_state(self.WAITING)
+            self.status_line.set_text("Saved")
         elif self.state == self.WAITING:
             self.set_state(self.RECORDING)
             self.indata = []
 
             def callback(indata, frames, time, status):
-                self.indata.append(np.copy(indata))
+                self.indata.append(np.copy(indata[:, 0]))
             self.stream = sd.InputStream(channels=1, samplerate=self.SAMPLERATE, callback=callback)
             self.stream.start()
 
@@ -179,14 +178,7 @@ class Soyla(object):
     def save_current(self):
         wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,
                       self.SAMPLERATE, self.cur_sound)
-        self.status_line.set_text("Saved")
         self.line_list[self.l_index].original_widget.set_text(self._format_line_for_sidebar(self.l_index))
-
-        def task():
-            time.sleep(1)
-            self.status_line.set_text("")
-            self.force_paint()
-        threading.Thread(target=task).start()
 
     def change_line(self, d):
         if self.state != self.WAITING:
@@ -240,6 +232,7 @@ class Soyla(object):
         self._draw_state_text()
         self._draw_line_text()
         self._draw_audio_status_line()
+        self.status_line.set_text("")
 
     def _draw_state_text(self):
         if self.state == self.RECORDING:

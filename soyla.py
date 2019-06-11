@@ -2,7 +2,6 @@
 import glob
 import numpy as np
 import sounddevice as sd
-import threading
 import urwid
 import os
 from scipy.io import wavfile
@@ -74,15 +73,20 @@ class Soyla(object):
         self.line_edit = urwid.Edit(align='center')
         self.line = urwid.WidgetPlaceholder(self.line_text)
         self.line_list = MyListBox(urwid.SimpleFocusListWalker(self._get_side_list()))
+        self.status_line = urwid.Text('')
         main_window = urwid.Pile([
             ('weight', 1, urwid.Filler(self.line)),
             ('pack', urwid.Divider('-')),
             ('weight', 1, urwid.Filler(self.state_text)),
+            ('pack', urwid.Divider('-')),
+            (1, urwid.Padding(urwid.Filler(self.status_line), left=1)),
         ])
+        vline = urwid.AttrWrap(urwid.SolidFill(u'\u2502'), 'line')
         self.top = urwid.Columns([
-            ('weight', 1, self.line_list),
+            ('weight', 1, urwid.Padding(self.line_list, left=1, right=1)),
+            ('fixed', 1, vline),
             ('weight', 2, main_window),
-        ], dividechars=3)
+        ])
 
     def _get_side_list(self):
         lines = [l[0] for l in self.lines]
@@ -209,6 +213,7 @@ class Soyla(object):
     def draw(self):
         self._draw_state_text()
         self._draw_line_text()
+        self._draw_status_line()
 
     def _draw_state_text(self):
         if self.state == self.RECORDING:
@@ -220,6 +225,15 @@ class Soyla(object):
         else:
             txt = "Waiting"
         self.state_text.set_text(txt)
+
+    def _draw_status_line(self):
+        status = ""
+        if self.cur_sound is None:
+            status = "No recording"
+        else:
+            length = self.cur_sound.size / self.SAMPLERATE
+            status = "Recording length: {:.2f} seconds".format(length)
+        self.status_line.set_text(status)
 
     @property
     def cur_line(self):

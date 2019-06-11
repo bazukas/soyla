@@ -59,6 +59,10 @@ class Soyla(object):
         self.lines = [(l.strip(), wavs.get(i), False) for i, l in enumerate(txt_lines)]
         self.lines_len = len(self.lines)
         self.l_index = 0
+        for i in range(self.lines_len):
+            if i not in wavs:
+                self.l_index = i
+                break
 
     def _save_lines(self):
         txt = '\n'.join([l[0] for l in self.lines])
@@ -75,6 +79,7 @@ class Soyla(object):
         self.line_edit = MyEdit(align='center')
         self.line = urwid.WidgetPlaceholder(self.line_text)
         self.line_list = MyListBox(urwid.SimpleFocusListWalker(self._get_side_list()))
+        self.line_list.set_focus(self.l_index)
         self.audio_status_line = urwid.Text('')
         self.status_line = urwid.Text('', align='right')
         status = urwid.Columns([

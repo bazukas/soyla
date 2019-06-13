@@ -29,6 +29,7 @@ class Soyla(object):
         self.lines_file = lines_file
         self._init_state()
         self._init_widgets()
+        self._calculate_total_audio_length()
         self.draw()
 
     def _read_wavs(self):
@@ -72,9 +73,11 @@ class Soyla(object):
         self.line_list = self._get_side_list()
         self.line_listbox = MyListBox(urwid.SimpleFocusListWalker(self.line_list))
         self.line_listbox.set_focus(self.l_index)
-        self.audio_status_line = urwid.Text('')
+        self.total_audio_text = urwid.Text('')
+        self.audio_status_line = urwid.Text('', align='center')
         self.status_line = urwid.Text('', align='right')
         status = urwid.Columns([
+            ('weight', 1, self.total_audio_text),
             ('weight', 1, self.audio_status_line),
             ('weight', 1, self.status_line),
         ])
@@ -91,6 +94,13 @@ class Soyla(object):
             ('fixed', 1, vline),
             ('weight', 2, main_window),
         ])
+
+    def _calculate_total_audio_length(self):
+        al = 0
+        for l in self.lines:
+            if l[1] is not None:
+                al += float(l[1].size / self.SAMPLERATE)
+        self.total_audio_length = al
 
     def _format_line_for_sidebar(self, i):
         check = ' ' if self.lines[i][1] is None else u'\u2714'
@@ -172,6 +182,7 @@ class Soyla(object):
         wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,
                       self.SAMPLERATE, self.cur_sound)
         self.line_list[self.l_index].original_widget.set_text(self._format_line_for_sidebar(self.l_index))
+        self._calculate_total_audio_length()
 
     def change_line(self, d):
         if self.state != self.WAITING:
@@ -227,6 +238,7 @@ class Soyla(object):
         self._draw_line_text()
         self._draw_audio_status_line()
         self.status_line.set_text("")
+        self.total_audio_text.set_text("Project audio length: {:.2f} seconds".format(self.total_audio_length))
 
     def _draw_state_text(self):
         if self.state == self.RECORDING:

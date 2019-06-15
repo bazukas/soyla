@@ -21,7 +21,16 @@ class Soyla(object):
     SAMPLERATE = 44100
 
     PALETTE = [
+        ('screen edge', 'black', 'black'),
+        ('line', 'light gray', 'black'),
+        ('main', 'light gray', 'black'),
         ('reversed', 'standout', ''),
+        ('check', 'dark green', 'black'),
+        ('text', 'white,bold', 'black'),
+        ('state', 'dark green', 'black'),
+        ('recording', 'light red', 'black'),
+        ('instructions', 'light magenta', 'black'),
+        ('status', 'yellow', 'black'),
     ]
 
     def __init__(self, lines_file, save_dir):
@@ -77,22 +86,24 @@ class Soyla(object):
         self.total_audio_text = urwid.Text('')
         self.audio_status_line = urwid.Text('', align='center')
         self.status_line = urwid.Text('', align='right')
-        vline = urwid.AttrWrap(urwid.SolidFill(u'\u2502'), 'line')
+        vline = urwid.AttrMap(urwid.SolidFill(u'\u2502'), 'line')
+        hline = urwid.AttrMap(urwid.Divider('─'), 'line')
         status = urwid.Columns([
             ('weight', 1, self.total_audio_text),
             ('weight', 1, self.audio_status_line),
             ('weight', 1, self.status_line),
         ])
+        status = urwid.AttrMap(status, 'status')
         state_instr = urwid.Columns([
             ('weight', 1, urwid.Filler(self.state_text)),
             ('fixed', 1, vline),
             ('weight', 1, urwid.Filler(urwid.Padding(self.instructions_text, 'center', width='pack'))),
         ])
         main_window = urwid.Pile([
-            ('weight', 1, urwid.Filler(self.line)),
-            ('pack', urwid.Divider('-')),
+            ('weight', 1, urwid.AttrMap(urwid.Filler(self.line), 'text')),
+            ('pack', hline),
             ('weight', 1, state_instr),
-            ('pack', urwid.Divider('-')),
+            ('pack', hline),
             (1, urwid.Padding(urwid.Filler(status), left=1, right=1)),
         ])
         self.top = urwid.Columns([
@@ -100,6 +111,12 @@ class Soyla(object):
             ('fixed', 1, vline),
             ('weight', 2, main_window),
         ])
+        bg = urwid.AttrMap(urwid.SolidFill(u"\u2592"), 'screen edge')
+        w = urwid.LineBox(urwid.AttrMap(self.top, 'main'))
+        w = urwid.AttrMap(w, 'line')
+        self.overlay = urwid.Overlay(w, bg,
+                                     ('fixed left', 1), ('fixed right', 1),
+                                     ('fixed top', 0), ('fixed bottom', 0))
 
     def _calculate_total_audio_length(self):
         al = 0
@@ -109,8 +126,8 @@ class Soyla(object):
         self.total_audio_length = al
 
     def _format_line_for_sidebar(self, i):
-        check = ' ' if self.lines[i][1] is None else u'\u2714'
-        return "{}  {}. {}".format(check, i, self.lines[i][0])
+        check = '  ' if self.lines[i][1] is None else u'\u2714 '
+        return [('check', check), " {}. {}".format(i, self.lines[i][0])]
 
     def _get_side_list(self):
         lines = [l[0] for l in self.lines]
@@ -122,12 +139,13 @@ class Soyla(object):
         return lines
 
     def handle_input(self, key):
-        if key in ('q', 'Q', 'esc'):
+        if key in ('q', 'Q'):
+            raise urwid.ExitMainLoop()
+        if key == 'esc':
             if self.state == self.EDITING:
                 return self.cancel_edit()
             elif self.state == self.RECORDING:
                 return self.cancel_record()
-            raise urwid.ExitMainLoop()
         if key in ('r', 'R'):
             return self.record()
         if key == ' ':
@@ -235,10 +253,11 @@ class Soyla(object):
         self.top.set_focus(0)
         self.line_list[self.l_index].original_widget.set_text(self._format_line_for_sidebar(self.l_index))
         self.set_state(self.WAITING)
+        self.status_line.set_text("Saved")
 
     def run(self):
         self.loop = urwid.MainLoop(
-            self.top,
+            self.overlay,
             unhandled_input=lambda k: self.handle_input(k),
             pop_ups=True,
             palette=self.PALETTE,
@@ -277,17 +296,17 @@ class Soyla(object):
                      "<esc> - cancel editing"
                      )
 
-        self.instructions_text.set_text(instr)
+        self.instructions_text.set_text(('instructions', instr))
 
     def _draw_state_text(self):
         if self.state == self.RECORDING:
-            txt = "Recording"
+            txt = ('recording', "Recording")
         elif self.state == self.PLAYING:
-            txt = "Playing"
+            txt = ('state', "Playing")
         elif self.state == self.EDITING:
-            txt = "Editing text"
+            txt = ('state', "Editing text")
         else:
-            txt = "Waiting"
+            txt = ('state', "Waiting")
         self.state_text.set_text(txt)
 
     def _draw_audio_status_line(self):

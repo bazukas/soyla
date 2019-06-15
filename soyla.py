@@ -66,6 +66,7 @@ class Soyla(object):
         self.state = self.WAITING
 
     def _init_widgets(self):
+        self.instructions_text = urwid.Text('', align='left')
         self.state_text = urwid.Text('', align='center')
         self.line_text = urwid.Text('', align='center')
         self.line_edit = urwid.Edit(align='center')
@@ -76,19 +77,24 @@ class Soyla(object):
         self.total_audio_text = urwid.Text('')
         self.audio_status_line = urwid.Text('', align='center')
         self.status_line = urwid.Text('', align='right')
+        vline = urwid.AttrWrap(urwid.SolidFill(u'\u2502'), 'line')
         status = urwid.Columns([
             ('weight', 1, self.total_audio_text),
             ('weight', 1, self.audio_status_line),
             ('weight', 1, self.status_line),
         ])
+        state_instr = urwid.Columns([
+            ('weight', 1, urwid.Filler(self.state_text)),
+            ('fixed', 1, vline),
+            ('weight', 1, urwid.Filler(urwid.Padding(self.instructions_text, 'center', width='pack'))),
+        ])
         main_window = urwid.Pile([
             ('weight', 1, urwid.Filler(self.line)),
             ('pack', urwid.Divider('-')),
-            ('weight', 1, urwid.Filler(self.state_text)),
+            ('weight', 1, state_instr),
             ('pack', urwid.Divider('-')),
             (1, urwid.Padding(urwid.Filler(status), left=1, right=1)),
         ])
-        vline = urwid.AttrWrap(urwid.SolidFill(u'\u2502'), 'line')
         self.top = urwid.Columns([
             ('weight', 1, urwid.Padding(self.line_listbox, left=1, right=1)),
             ('fixed', 1, vline),
@@ -119,6 +125,8 @@ class Soyla(object):
         if key in ('q', 'Q', 'esc'):
             if self.state == self.EDITING:
                 return self.cancel_edit()
+            elif self.state == self.RECORDING:
+                return self.cancel_record()
             raise urwid.ExitMainLoop()
         if key in ('r', 'R'):
             return self.record()
@@ -136,6 +144,13 @@ class Soyla(object):
     def set_state(self, s):
         self.state = s
         self.draw()
+
+    def cancel_record(self):
+        if self.state != self.RECORDING:
+            return
+        self.stream.stop()
+        self.stream.close()
+        self.set_state(self.WAITING)
 
     def record(self):
         if self.state == self.RECORDING:
@@ -239,6 +254,30 @@ class Soyla(object):
         self._draw_audio_status_line()
         self.status_line.set_text("")
         self.total_audio_text.set_text("Project audio length: {:.2f} seconds".format(self.total_audio_length))
+        self._draw_instructions()
+
+    def _draw_instructions(self):
+        instr = ''
+        if self.state == self.WAITING:
+            instr = ("Q - exit program\n"
+                     "J - next line\n"
+                     "K - previous line\n"
+                     "R - record line\n"
+                     "E - edit text\n"
+                     "<space> - play"
+                     )
+        elif self.state == self.RECORDING:
+            instr = ("R - finish recording\n"
+                     "<esc> - cancel recording"
+                     )
+        elif self.state == self.PLAYING:
+            instr = "<space> - stop plaing"
+        elif self.state == self.EDITING:
+            instr = ("<enter> - save line\n"
+                     "<esc> - cancel editing"
+                     )
+
+        self.instructions_text.set_text(instr)
 
     def _draw_state_text(self):
         if self.state == self.RECORDING:

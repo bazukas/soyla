@@ -7,6 +7,54 @@ import os
 from scipy.io import wavfile
 
 
+class AudioReadWriter(object):
+    def __init__(self, wav_dir, samplerate):
+        self.wav_dir = wav_dir
+        self.samplerate = samplerate
+        self.read_audio_lengths()
+
+    def _calc_sum_len(self):
+        self.sum_length = 0
+        for v in self.lengths.values():
+            self.sum_length += v
+
+    def read_audio_lengths(self):
+        wavs = glob.glob(os.path.join(self.wav_dir, '*.wav'))
+        self.lengths = {}
+        for w in wavs:
+            i = os.path.splitext(os.path.basename(w))[0]
+            try:
+                i = int(i)
+            except ValueError:
+                continue
+            _, s = wavfile.read(w)
+            self.lengths[i] = s.shape[0] / self.samplerate
+        self._calc_sum_len()
+
+    def data(self, i):
+        if i not in self.lengths:
+            return None
+        _, s = wavfile.read(os.path.join(self.wav_dir, "{}.wav".format(i)))
+        return s
+
+    def length(self, i):
+        return self.lengths.get(i)
+
+    def save(self, i, data):
+        wavfile.write(os.path.join(self.wav_dir, '{}.wav'.format(i)),
+                      self.samplerate, data)
+        self.lengths[i] = data.shape[0] / self.samplerate
+        self._calc_sum_len()
+
+    def __setitem__(self, key, value):
+        if type(key) != int:
+            raise TypeError("key must be int")
+        self.save(key, value)
+
+    def __contains__(self, i):
+        return i in self.lengths
+
+
 class MyListBox(urwid.ListBox):
     def keypress(self, size, key):
         return key
@@ -38,39 +86,26 @@ class Soyla(object):
         self.lines_file = lines_file
         self._init_state()
         self._init_widgets()
-        self._calculate_total_audio_length()
         self.draw()
-
-    def _read_wavs(self):
-        wavs = glob.glob(os.path.join(self.save_dir, '*.wav'))
-        res = {}
-        for w in wavs:
-            i = os.path.splitext(os.path.basename(w))[0]
-            try:
-                i = int(i)
-            except ValueError:
-                continue
-            _, res[i] = wavfile.read(w)
-        return res
 
     def _read_lines(self):
         with open(self.lines_file, 'r') as f:
             txt_lines = f.readlines()
-        wavs = self._read_wavs()
-        self.lines = [(l.strip(), wavs.get(i), False) for i, l in enumerate(txt_lines)]
+        self.lines = [l.strip() for l in txt_lines]
         self.lines_len = len(self.lines)
         self.l_index = 0
         for i in range(self.lines_len):
-            if i not in wavs:
+            if i not in self.audio:
                 self.l_index = i
                 break
 
     def _save_lines(self):
-        txt = '\n'.join([l[0] for l in self.lines])
+        txt = '\n'.join(self.lines)
         with open(self.lines_file, 'w') as f:
             f.write(txt)
 
     def _init_state(self):
+        self.audio = AudioReadWriter(self.save_dir, self.SAMPLERATE)
         self._read_lines()
         self.state = self.WAITING
 
@@ -118,21 +153,13 @@ class Soyla(object):
                                      ('fixed left', 1), ('fixed right', 1),
                                      ('fixed top', 0), ('fixed bottom', 0))
 
-    def _calculate_total_audio_length(self):
-        al = 0
-        for l in self.lines:
-            if l[1] is not None:
-                al += float(l[1].size / self.SAMPLERATE)
-        self.total_audio_length = al
-
     def _format_line_for_sidebar(self, i):
-        check = '  ' if self.lines[i][1] is None else u'\u2714 '
-        return [('check', check), " {}. {}".format(i, self.lines[i][0])]
+        check = '\u2714 ' if i in self.audio else '  '
+        return [('check', check), " {}. {}".format(i, self.lines[i])]
 
     def _get_side_list(self):
-        lines = [l[0] for l in self.lines]
         lines = []
-        for i, l in enumerate(self.lines):
+        for i in range(self.lines_len):
             lines.append(self._format_line_for_sidebar(i))
         lines = [urwid.Text(l, wrap='clip') for l in lines]
         lines = [urwid.AttrMap(l, None, focus_map='reversed') for l in lines]
@@ -174,8 +201,7 @@ class Soyla(object):
         if self.state == self.RECORDING:
             self.stream.stop()
             self.stream.close()
-            self.cur_sound = np.concatenate(self.indata)
-            self.save_current()
+            self.save_current(np.concatenate(self.indata))
             self.set_state(self.WAITING)
             self.status_line.set_text("Saved")
         elif self.state == self.WAITING:
@@ -211,11 +237,9 @@ class Soyla(object):
                                           callback=callback, finished_callback=fcallback)
         self.out_stream.start()
 
-    def save_current(self):
-        wavfile.write(os.path.join(self.save_dir, '%d.wav') % self.l_index,
-                      self.SAMPLERATE, self.cur_sound)
+    def save_current(self, data):
+        self.audio[self.l_index] = data
         self.line_list[self.l_index].original_widget.set_text(self._format_line_for_sidebar(self.l_index))
-        self._calculate_total_audio_length()
 
     def change_line(self, d):
         if self.state != self.WAITING:
@@ -272,7 +296,7 @@ class Soyla(object):
         self._draw_line_text()
         self._draw_audio_status_line()
         self.status_line.set_text("")
-        self.total_audio_text.set_text("Project audio length: {:.2f} seconds".format(self.total_audio_length))
+        self.total_audio_text.set_text("Project audio length: {:.2f} seconds".format(self.audio.sum_length))
         self._draw_instructions()
 
     def _draw_instructions(self):
@@ -311,29 +335,27 @@ class Soyla(object):
 
     def _draw_audio_status_line(self):
         status = ""
-        if self.cur_sound is None:
+        if self.cur_sound_len is None:
             status = "No recording"
         else:
-            length = self.cur_sound.size / self.SAMPLERATE
-            status = "Recording length: {:.2f} seconds".format(length)
+            status = "Recording length: {:.2f} seconds".format(self.cur_sound_len)
         self.audio_status_line.set_text(status)
 
     @property
     def cur_line(self):
-        return self.lines[self.l_index][0]
+        return self.lines[self.l_index]
 
     @cur_line.setter
     def cur_line(self, l):
-        _, s, b = self.lines[self.l_index]
-        self.lines[self.l_index] = (l, s, b)
+        self.lines[self.l_index] = l
 
     @property
     def cur_sound(self):
-        return self.lines[self.l_index][1]
+        return self.audio.data(self.l_index)
 
-    @cur_sound.setter
-    def cur_sound(self, s):
-        self.lines[self.l_index] = (self.cur_line, s, True)
+    @property
+    def cur_sound_len(self):
+        return self.audio.length(self.l_index)
 
     def _draw_line_text(self):
         self.line_text.set_text(self.cur_line)

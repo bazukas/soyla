@@ -118,15 +118,15 @@ class Soyla(object):
         self.line_list = self._get_side_list()
         self.line_listbox = MyListBox(urwid.SimpleFocusListWalker(self.line_list))
         self.line_listbox.set_focus(self.l_index)
-        self.total_audio_text = urwid.Text('')
-        self.audio_status_line = urwid.Text('', align='center')
-        self.status_line = urwid.Text('', align='right')
+        self.total_audio_text = urwid.Text('', align='right')
+        self.audio_status_line = urwid.Text('', align='left')
+        self.status_line = urwid.Text('', align='center')
         vline = urwid.AttrMap(urwid.SolidFill(u'\u2502'), 'line')
         hline = urwid.AttrMap(urwid.Divider('─'), 'line')
         status = urwid.Columns([
-            ('weight', 1, self.total_audio_text),
             ('weight', 1, self.audio_status_line),
             ('weight', 1, self.status_line),
+            ('weight', 1, self.total_audio_text),
         ])
         status = urwid.AttrMap(status, 'status')
         state_instr = urwid.Columns([

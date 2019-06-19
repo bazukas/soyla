@@ -25,54 +25,64 @@ class Soyla(object):
         with open(self.lines_file, 'w') as f:
             f.write(txt)
 
-    def handle_input(self, key):
-        if key in ('q', 'Q'):
-            raise urwid.ExitMainLoop()
-        if key == 'esc':
-            if self.state == SoylaState.EDITING:
-                return self.cancel_edit()
-            elif self.state == SoylaState.RECORDING:
-                return self.cancel_record()
-        if key in ('r', 'R'):
-            return self.record()
-        if key == ' ':
-            return self.play()
-        if key in ('j', 'J', 'down'):
-            return self.change_line(1)
-        if key in ('k', 'K', 'up'):
-            return self.change_line(-1)
-        if key in ('e', 'E'):
-            return self.edit()
-        if key == 'enter':
-            return self.finish_edit()
-
     def set_state(self, s):
         self.state = s
         self.view.update_state(s)
 
+    def handle_input(self, key):
+        def exit():
+            raise urwid.ExitMainLoop()
+        handlers = {
+            SoylaState.WAITING: [
+                (('q', 'Q'), exit),
+                (('r', 'R'), self.record),
+                ((' ',), self.play),
+                (('j', 'J', 'down'), lambda: self.change_line(1)),
+                (('k', 'K', 'up'), lambda: self.change_line(-1)),
+                (('e', 'E'), self.edit),
+            ],
+            SoylaState.RECORDING: [
+                (('r', 'R'), self.finish_record),
+                (('esc',), self.cancel_record),
+            ],
+            SoylaState.PLAYING: [
+                ((' ',), self.cancel_play),
+            ],
+            SoylaState.EDITING: [
+                (('enter',), self.finish_edit),
+                (('esc',), self.cancel_edit),
+            ]
+        }
+        for ks, h in handlers[self.state]:
+            if key in ks:
+                return h()
+
     def cancel_record(self):
-        if self.state != SoylaState.RECORDING:
-            return
+        assert self.state == SoylaState.RECORDING
         self.audio.stop_recording()
         self.set_state(SoylaState.WAITING)
 
+    def finish_record(self):
+        assert self.state == SoylaState.RECORDING
+        data = self.audio.stop_recording()
+        self.model.save_audio(self.model.l_index, data)
+        self.view.update_sidebar_line(self.model.l_index)
+        self.set_state(SoylaState.WAITING)
+        self.view.update_line()
+        self.view.show_saved()
+
     def record(self):
-        if self.state == SoylaState.RECORDING:
-            data = self.audio.stop_recording()
-            self.model.save_audio(self.model.l_index, data)
-            self.view.update_sidebar_line(self.model.l_index)
-            self.set_state(SoylaState.WAITING)
-            self.view.update_line()
-            self.view.show_saved()
-        elif self.state == SoylaState.WAITING:
-            self.set_state(SoylaState.RECORDING)
-            self.audio.start_recording()
+        assert self.state == SoylaState.WAITING
+        self.set_state(SoylaState.RECORDING)
+        self.audio.start_recording()
+
+    def cancel_play(self):
+        assert self.state == SoylaState.PLAYING
+        self.audio.stop_playing()
 
     def play(self):
-        if self.state == SoylaState.PLAYING:
-            self.audio.stop_playing()
-            return
-        if self.state != SoylaState.WAITING or self.model.cur_audio() is None:
+        assert self.state == SoylaState.WAITING
+        if self.model.cur_audio() is None:
             return
         self.set_state(SoylaState.PLAYING)
 
@@ -82,26 +92,22 @@ class Soyla(object):
         self.audio.play(self.model.cur_audio(), cb=fcallback)
 
     def change_line(self, d):
-        if self.state != SoylaState.WAITING:
-            return
+        assert self.state == SoylaState.WAITING
         self.model.change_line(d)
         self.view.update_line()
 
     def edit(self):
-        if self.state != SoylaState.WAITING:
-            return
+        assert self.state == SoylaState.WAITING
         self.view.start_edit()
         self.set_state(SoylaState.EDITING)
 
     def cancel_edit(self):
-        if self.state != SoylaState.EDITING:
-            return
+        assert self.state == SoylaState.EDITING
         self.view.finish_edit()
         self.set_state(SoylaState.WAITING)
 
     def finish_edit(self):
-        if self.state != SoylaState.EDITING:
-            return
+        assert self.state == SoylaState.EDITING
         edit_txt = self.view.finish_edit()
         self.model.update_line(self.model.l_index, edit_txt)
         self.view.update_sidebar_line(self.model.l_index)
@@ -110,6 +116,9 @@ class Soyla(object):
         self.view.update_line()
         self.view.show_saved()
 
+    def force_paint(self):
+        self.loop.draw_screen()
+
     def run(self):
         self.loop = urwid.MainLoop(
             self.view.top_widget(),
@@ -117,9 +126,6 @@ class Soyla(object):
             palette=self.view.PALETTE,
         )
         self.loop.run()
-
-    def force_paint(self):
-        self.loop.draw_screen()
 
 
 def main(input_file, save_dir):

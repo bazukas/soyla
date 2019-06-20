@@ -29,6 +29,9 @@ _INSTRS = {
 
 @unique
 class SoylaState(Enum):
+    """
+    Enum for possible states of program
+    """
     WAITING = 0
     RECORDING = 1
     PLAYING = 2

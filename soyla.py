@@ -8,9 +8,16 @@ from state import SoylaState
 
 
 class Soyla(object):
+    """
+    Controller class for the program
+    """
     SAMPLERATE = 44100
 
     def __init__(self, lines_file, save_dir):
+        """
+        :param lines_file: path to file containing lines
+        :param save_dir: path to directory containing recorded wav files
+        """
         self.save_dir = save_dir
         self.lines_file = lines_file
 
@@ -21,15 +28,26 @@ class Soyla(object):
         self.set_state(SoylaState.WAITING)
 
     def update_lines_file(self):
+        """
+        rewrite file with updated lines
+        """
         txt = '\n'.join(self.model.get_lines())
         with open(self.lines_file, 'w') as f:
             f.write(txt)
 
     def set_state(self, s):
+        """
+        update state
+        :param s: SoylaState object
+        """
         self.state = s
         self.view.update_state(s)
 
     def handle_input(self, key):
+        """
+        handles user keyboard input
+        :param key: pressed key
+        """
         def exit():
             raise urwid.ExitMainLoop()
         handlers = {
@@ -58,11 +76,17 @@ class Soyla(object):
                 return h()
 
     def cancel_record(self):
+        """
+        cancel recording audio
+        """
         assert self.state == SoylaState.RECORDING
         self.audio.stop_recording()
         self.set_state(SoylaState.WAITING)
 
     def finish_record(self):
+        """
+        finish recording, save recorded audio
+        """
         assert self.state == SoylaState.RECORDING
         data = self.audio.stop_recording()
         self.model.save_audio(self.model.l_index, data)
@@ -72,15 +96,24 @@ class Soyla(object):
         self.view.show_saved()
 
     def record(self):
+        """
+        start recording audio
+        """
         assert self.state == SoylaState.WAITING
         self.set_state(SoylaState.RECORDING)
         self.audio.start_recording()
 
     def cancel_play(self):
+        """
+        stop audio playback
+        """
         assert self.state == SoylaState.PLAYING
         self.audio.stop_playing()
 
     def play(self):
+        """
+        start audio playback if current line has one
+        """
         assert self.state == SoylaState.WAITING
         if self.model.cur_audio() is None:
             return
@@ -88,25 +121,37 @@ class Soyla(object):
 
         def fcallback():
             self.set_state(SoylaState.WAITING)
-            self.force_paint()
+            self.force_draw()
         self.audio.play(self.model.cur_audio(), cb=fcallback)
 
     def change_line(self, d):
+        """
+        change selected line
+        """
         assert self.state == SoylaState.WAITING
         self.model.change_line(d)
         self.view.update_line()
 
     def edit(self):
+        """
+        start editing of selected line
+        """
         assert self.state == SoylaState.WAITING
         self.view.start_edit()
         self.set_state(SoylaState.EDITING)
 
     def cancel_edit(self):
+        """
+        cancel editing
+        """
         assert self.state == SoylaState.EDITING
         self.view.finish_edit()
         self.set_state(SoylaState.WAITING)
 
     def finish_edit(self):
+        """
+        finish editing, save text of edited line
+        """
         assert self.state == SoylaState.EDITING
         edit_txt = self.view.finish_edit()
         self.model.update_line(self.model.l_index, edit_txt)
@@ -116,10 +161,16 @@ class Soyla(object):
         self.view.update_line()
         self.view.show_saved()
 
-    def force_paint(self):
+    def force_draw(self):
+        """
+        force drawing screen
+        """
         self.loop.draw_screen()
 
     def run(self):
+        """
+        run the program
+        """
         self.loop = urwid.MainLoop(
             self.view.top_widget(),
             unhandled_input=lambda k: self.handle_input(k),

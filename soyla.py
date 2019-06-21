@@ -1,4 +1,6 @@
 # encoding: utf-8
+import argparse
+from pathlib import Path
 import urwid
 
 from audio import AudioReadWriter, AudioDevice
@@ -11,9 +13,7 @@ class Soyla(object):
     """
     Controller class for the program
     """
-    SAMPLERATE = 44100
-
-    def __init__(self, lines_file, save_dir):
+    def __init__(self, lines_file, save_dir, samplerate=44100):
         """
         :param lines_file: path to file containing lines
         :param save_dir: path to directory containing recorded wav files
@@ -21,8 +21,8 @@ class Soyla(object):
         self.save_dir = save_dir
         self.lines_file = lines_file
 
-        self.audio = AudioDevice(self.SAMPLERATE)
-        self.model = SoylaModel(self.lines_file, AudioReadWriter(self.save_dir, self.SAMPLERATE))
+        self.audio = AudioDevice(samplerate)
+        self.model = SoylaModel(self.lines_file, AudioReadWriter(self.save_dir, samplerate))
         self.view = SoylaView(self.model)
 
         self.set_state(SoylaState.WAITING)
@@ -179,6 +179,16 @@ class Soyla(object):
         self.loop.run()
 
 
-def main(input_file, save_dir):
-    s = Soyla(input_file, save_dir)
+def main(input_file, save_dir, samplerate=44100):
+    s = Soyla(input_file, save_dir, samplerate=samplerate)
     s.run()
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('lines', type=Path, help='path to file with lines')
+parser.add_argument('wav_dir', type=Path, help='path to directory containing wav files')
+parser.add_argument('-sr', '--samplerate', type=int, default=44100, help='audio samplerate, default: 44100')
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    main(args.lines, args.wav_dir, args.samplerate)

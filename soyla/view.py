@@ -1,7 +1,7 @@
 # encoding: utf-8
 import urwid
 
-from state import SoylaState
+from .state import SoylaState
 
 
 class MyListBox(urwid.ListBox):

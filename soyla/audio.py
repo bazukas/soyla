@@ -16,6 +16,8 @@ class AudioReadWriter(object):
         :param wav_dir: directory where to read/write wav files from
         :param samplerate: used audio samplerate
         """
+        if not os.path.exists(wav_dir):
+            os.makedirs(wav_dir)
         self.wav_dir = wav_dir
         self.samplerate = samplerate
         self._read_audio_lengths()

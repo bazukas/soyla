@@ -1,3 +1,5 @@
 soyla.egg-info
 __pycache__
 .python-version
+build
+dist
